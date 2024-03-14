@@ -125,7 +125,7 @@ KGP_REF="/projects/bmeg/A6/1000G/1kgp_reference"
 plink --bfile ${COHORT} \
         --extract ${PRUNED} \
         --make-bed \
-        --out ${COHORT}
+        --out ${COHORT}_passLD
 #?# 4. Do the same on the 1KGP_reference bfile which is located in /projects/bmeg/A7/1000G/ (1pt)
 plink --bfile ${KGP_REF} \
         --extract ${PRUNED} \
