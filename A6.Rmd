@@ -125,11 +125,11 @@ KGP_REF="/projects/bmeg/A6/1000G/1kgp_reference"
 plink --bfile ${COHORT} \
         --extract ${PRUNED} \
         --make-bed \
-        --out ${COHORT}_passLD
+        --out ${COHORT}_pr
 #?# 4. Do the same on the 1KGP_reference bfile which is located in /projects/bmeg/A7/1000G/ (1pt)
 plink --bfile ${KGP_REF} \
         --extract ${PRUNED} \
-        --make-bed \
+        --make-bed \    
         --out /home/tliang_bmeg24/A6/MiniCohort/1kgp_reference
 
 ```
@@ -144,6 +144,17 @@ You can create a merged bfile (containing a .fam, .bed and .bim file) from your 
 #?# 5.  Merge your pruned bfiles of the Mini_cohort and the 1KGP created on the previous step (0.5pts)
 ## NOTE: Remember to create a new bfile (.fam, .bed and .bim files) that contains the merged data.
 ## IMPORTANT TIME CONSTRAINT: This step can take ~15 minutes, so make sure to check the server status before you run it!
+
+COHORT_DIR="/home/tliang_bmeg24/A6/MiniCohort"
+PR="${COHORT_DIR}/Mini_cohort_QCed_pr"
+KGP_REF="${COHORT_DIR}/1kgp_reference"
+OUT_FILE="${COHORT_DIR}/merged_bfile"
+
+# run it
+plink --bfile ${PR} \
+        --bmerge ${KGP_REF} \
+        --out ${OUT_FILE}
+
 
 ```
 
