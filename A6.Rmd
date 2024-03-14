@@ -5,8 +5,9 @@ output:
     toc: true
     toc_depth: 4
 ---
-```{r setup, include=FALSE}
+```{r setup, include=FALSE, message=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
 ```
 # BMEG 424 Assignment 6: GWAS and Polygenic Risk Scores ()
 ## Introduction:
@@ -162,6 +163,9 @@ plink --bfile ${PR} \
 You can now perform a PCA on the merged bfile you output in the last step: 
 ```{bash, eval=FALSE}
 #?# 6. Using plink, perform a PCA analysis in plink on the merged set (0.5pts)
+
+# Sourced from https://www.cog-genomics.org/plink/1.9/strat#pca
+
 MERGED="/home/tliang_bmeg24/A6/MiniCohort/merged_bfile"
 OUT_FILE="/home/tliang_bmeg24/A6/MiniCohort/merged_pca"
 # Run this to calculate the pca
@@ -178,12 +182,25 @@ You PCA computation should have output a `.eigenvec` file. Copy this file, and t
 First you will want to load your `.eigenvec` and `samples_info.txt` file into R. You can use the `read.table` function to do this. Set the column names for the `.eigenvec` file to change the column names to: FID, IID, PC1, PC2, PC3, ..., PC20. Set the column names to: FID, IID, SuperPopulation, Population. 
 
 #?# 7. Load the `.eigenvec` and `samples_info.txt` file into R and set the column names as described above. (0.25 pts)
-```{r, eval=FALSE}
+```{r, eval=T}
+# Some column names from paragraph
+pcs <- paste0("PC", seq(1,20))
+ev_names <- c("FID", "IID", pcs)
+ev <- read.table("output/merged_pca.eigenvec", col.names = ev_names)
+# As per piazza https://piazza.com/class/lqxz3jehdlc57y/post/130
+# Also change colnames of samples_info
+samples_names <- c("IID", "FID", "SuperPopulation", "Population")
+samples_info <- read.table("output/samples_info.txt", col.names = samples_names)
 
 ```
 
 #?# 8. Merge the two dataframes using the IID column (look at the merge function documentation by typing `?merge` in the R console). (0.25 pts)
-```{r, eval=FALSE}
+```{r, eval=T}
+
+# Merging by IID, ignoring the overlapped FID since instruction
+# did not mention what to do with it
+merged_df <- merge(ev, samples_info, by="IID")
+
 
 ```
 
@@ -193,14 +210,23 @@ First you will want to load your `.eigenvec` and `samples_info.txt` file into R.
 - color: SuperPopulation - to use the Population information to color the samples and be able to appreciate population structure
 ```{r} 
 # include the code used to generate the plot below, when you knit your Rmd file verify that the plot is displayed
+
+merged_df %>%
+  ggplot(aes(x=PC1, y = PC2, color=SuperPopulation)) +
+  geom_point() +
+  theme_bw() +
+  scale_color_brewer(palette = "Set1") +
+  ggtitle("PCA of MiniCohor and 1kGP reference SNPs by super population")
+
 ```
 
 #?# 10. Where do the cohort samples fall? (0.5 pts)
 
-
+> The cohort Samples fall on the upper left half of the graph, so high PC2, but low PC1. It stays quite close to those of SAS, AMR, EUR and far away from EAS and AFR.
 
 #?# 11. Which population would you use as a reference for imputation? Why? (1.5 pts)
 
+For reference of imputation, I would choose the AMR super population. This is because it has most overlap with our minicohort samples, otherwise taking SAS as consideration as well.
 
 #### d. Imputation
 Imputation of genetic data is a very computationally intensive analysis, that can take a long time. So we have performed it for you. Using the chromosome 17 imputation information located in `/projects/bmeg/A6/MiniCohort` under the `Mini_cohort_chr17_imputation_results.info` we will calculate some post-imputation metrics. 
@@ -209,7 +235,15 @@ Load the imputation.info file into your R environment using `read.table` and the
 
 #?# 12. What is the percentage of imputed SNPs? (1 pt)
 ```{r}
+# So load the file
+imputation <- read.table("output/Mini_cohort_chr17_imputation_results.info", header=T)
 
+# percentage of imputed SNPs
+percentages <- imputation %>%
+  group_by(Genotyped) %>%
+  summarize(count = n() /nrow(imputation) * 100)
+
+percentages
 ```
 
 The metric of imputation quality is Rsq, this is the estimated value of the squared correlation between imputed and true genotypes. Since true genotypes are not available, this calculation is based on the idea that poorly imputed genotype counts will shrink towards their expectations based on allele frequencies observed in the population (https://genome.sph.umich.edu/wiki/Minimac3_Info_File#Rsq).  An Rsq < 0.3 is often used to flag poorly imputed SNPs.
@@ -217,14 +251,29 @@ The metric of imputation quality is Rsq, this is the estimated value of the squa
 #?# 13. What is the percentage of poorly imputed SNPs? (1 pt)
 ```{r}
 
+# So only looking at those that genotype as imputed
+imputed <- imputation %>% filter(Genotyped == "Imputed")
+# Since Rsq being poorly imputed
+poor_impute_n <- imputed %>%
+              filter(Rsq < 0.3) %>%
+              nrow()
+
+(poor_impute_n / nrow(imputed)) *  100
 ```
 
 #?# 14. Visualize the distribution of the MAF in your imputed data (0.5 pts)
-```{r}
-
+```{r message=FALSE}
+imputed %>%
+  ggplot(aes(x=MAF)) +
+  geom_histogram(col="white", fill="skyblue") +
+  scale_y_log10() + 
+  theme_bw() +
+  labs(x="Minor Allele Frequency", title="Minor Allele Frequency Distribution in the imputed data")
 ```
 
 #?# 15. Analyze the plot above, what do you notice? (2 pts)
+
+There is a peak value at 0, meaning many of our imputed data have 0 minor allele frequency. Rest, like MAF after 0 seems to be uniformly distributed, with MAF value cap around 0.5.
 
 
 ### 3. Calculating Polygenic Scores (manual approach)
@@ -251,15 +300,46 @@ Where:
 #?# 16. Using the above information, calculate the PRS for each individual in the Mini Cohort.  
 ```{r}
 # Tip: You only need the files in the tapas directory to complete this question
+
+# Load files
+dosages <- read.table("output/MiniCohort_Tapas_SNPdosages.txt", header=T)
+sum_stat <- read.table("output/Tapas_enjoyability_GWAS_sumStats.txt", header=T)
+
+# helper fun to calculate prs
+calculate_PRS <- function(beta, gene) {
+  multi <- beta * gene
+  prs <- sum(multi)
+  return(prs)
+}
+
+
+prs_mini <- dosages %>%
+  pivot_longer(starts_with("rs"), names_to = "SNP") %>%
+  left_join(sum_stat, by="SNP") %>%
+  group_by(IID) %>%
+  summarize(PRS = calculate_PRS(beta=Effect_Size, value))
+
+prs_mini %>% knitr::kable()
+
 ```
+
+
 
 
 #?# 17. Plot a histogram of the PRSs. (0.5 pts)
 ```{r}
-
+prs_mini %>%
+  ggplot(aes(x=PRS)) +
+  geom_histogram(color="white", fill="blue") +
+  geom_vline(aes(xintercept = mean(PRS)), color="red", linetype="dashed", linewidth=2) +
+  labs(x = "Polygenic Score", title = "Polygenic Scores Distribution") +
+  theme_bw() +
+  theme(axis.text.x = element_text(angle = 75, hjust = 1))
 ```
 
 #?# 18. What do you notice about the distribution of the PRSs? (1 pt)
+
+There's single mode at around 12 or 13 of polygenic score. Its distribution looks roughly normal, whereas red line represent the mean of polygenic score.
 
 
 ### 4. Calculating Polygenic Scores (automated approach)
