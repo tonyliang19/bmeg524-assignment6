@@ -153,6 +153,7 @@ OUT_FILE="${COHORT_DIR}/merged_bfile"
 # run it
 plink --bfile ${PR} \
         --bmerge ${KGP_REF} \
+        --make-bed \
         --out ${OUT_FILE}
 
 
@@ -161,6 +162,12 @@ plink --bfile ${PR} \
 You can now perform a PCA on the merged bfile you output in the last step: 
 ```{bash, eval=FALSE}
 #?# 6. Using plink, perform a PCA analysis in plink on the merged set (0.5pts)
+MERGED="/home/tliang_bmeg24/A6/MiniCohort/merged_bfile"
+OUT_FILE="/home/tliang_bmeg24/A6/MiniCohort/merged_pca"
+# Run this to calculate the pca
+plink --bfile ${MERGED} \
+      --pca \
+      --out ${OUT_FILE}
 
 
 ```
