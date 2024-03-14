@@ -62,8 +62,18 @@ You can perform all of these filters using a single command calling `plink`. Tak
 ```{bash, eval=FALSE}
 #?# 1. Fill in the following command and use it to perform the QC on the Mini-Cohort data. Read the instructions above carefully to get the right values for each argument. (1 pt)
 
-plink --bfile /projects/bmeg/A6/MiniCohort/Mini_cohort <args> --out /home/<username>/A6/MiniCohort/Mini_cohort_QCed
+# Sourced from https://www.cog-genomics.org/plink/1.9/filter
 
+# geno for remove SNPs with more than 5% missingness
+# mind for remove samples with more than 2% missingness
+# maf for remove SNPs with MAF lower than 1%
+
+plink --bfile /projects/bmeg/A6/MiniCohort/Mini_cohort\
+        --geno 0.05 \
+        --mind 0.02 \
+        --maf 0.01 \
+        --make-bed \
+        --out /home/tliang_bmeg24/A6/MiniCohort/Mini_cohort_QCed
 ```
 
 ### 2. Imputation of Genotypes from 1000 Genomes Data
@@ -89,6 +99,17 @@ We will also want to perform *dynamic* LD pruning which is available to us throu
 ## - VIF (variance inflation factor): 0.2 
 #?# 2. Type the command you use to create the Mini Cohort PCA-QCed bfile below (1pt)
 
+# Sourced from https://www.cog-genomics.org/plink/1.9/ld
+# PARAMS
+LD_FILE="/projects/bmeg/A6/high_LD_regions_hg19.txt"
+INPUT_DATA="/home/tliang_bmeg24/A6/MiniCohort/Mini_cohort_QCed"
+# Then run the plink here
+# Could be problem with indep?
+plink --bfile ${INPUT_DATA} \
+        --indep-pairwise 200 10 0.2 \
+        --exclude ${LD_FILE} \
+        --out ${INPUT_DATA}
+
 
 ```
 
@@ -96,8 +117,20 @@ You should have a new file called `plink.prune.in` which you can use to extract 
 
 ```{bash, eval=FALSE}
 #?# 3. Use plink to extract the SNPs which passed the LD pruning from the QC'd minicohort file you created in Q1. (1pt)
-
+# PARAMS
+COHORT="/home/tliang_bmeg24/A6/MiniCohort/Mini_cohort_QCed"
+PRUNED="${COHORT}.prune.in"
+KGP_REF="/projects/bmeg/A6/1000G/1kgp_reference"
+# THE ONES PASS LD FROM QCD MINICOHORT
+plink --bfile ${COHORT} \
+        --extract ${PRUNED} \
+        --make-bed \
+        --out ${COHORT}
 #?# 4. Do the same on the 1KGP_reference bfile which is located in /projects/bmeg/A7/1000G/ (1pt)
+plink --bfile ${KGP_REF} \
+        --extract ${PRUNED} \
+        --make-bed \
+        --out /home/tliang_bmeg24/A6/MiniCohort/1kgp_reference
 
 ```
 
